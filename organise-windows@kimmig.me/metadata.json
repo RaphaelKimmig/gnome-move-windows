@@ -1,0 +1,10 @@
+{
+  "name": "Organise windows",
+  "description": "Move windows to assigned workspaces on the primary screen",
+  "settings-schema": "org.gnome.shell.extensions.organise-windows",
+  "gettext-domain": "organise-windows",
+  "uuid": "organise-windows@kimmig.me",
+  "shell-version": [
+    "46"
+  ]
+}
