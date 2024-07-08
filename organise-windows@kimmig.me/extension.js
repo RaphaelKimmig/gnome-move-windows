@@ -1,17 +1,12 @@
-// SPDX-FileCopyrightText: 2011 Giovanni Campagna <gcampagna@src.gnome.org>
-// SPDX-FileCopyrightText: 2011 Alessandro Crismani <alessandro.crismani@gmail.com>
-// SPDX-FileCopyrightText: 2014 Florian Müllner <fmuellner@gnome.org>
-//
-// SPDX-License-Identifier: GPL-2.0-or-later
+// Move apps to custom workspaces on the pirmary screen
 
-// -*- mode: js2; indent-tabs-mode: nil; js2-basic-offset: 4 -*-
-// Start apps on custom workspaces
-
+import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+
 
 class WindowMover {
   constructor(settings) {
@@ -19,6 +14,7 @@ class WindowMover {
     this._appSystem = Shell.AppSystem.get_default();
     this._appConfigs = new Map();
     this._windowTracker = Shell.WindowTracker.get_default();
+    this._timeout_id = null;
 
     this._settings.connectObject('changed',
       this._updateAppConfigs.bind(this), this);
@@ -41,6 +37,8 @@ class WindowMover {
     this._settings = null;
     this._windowTracker = null;
 
+    GLib.source_remove(this._timeout_id);
+
     this._appConfigs.clear();
   }
 
@@ -58,23 +56,30 @@ class WindowMover {
     window.change_workspace_by_index(workspaceNum, false);
   }
 
-  organiseWindows() {
-
+  _moveWindowsToPrimaryMonitor() {
     let primaryMonitor = Main.layoutManager.primaryMonitor;
     let windows = global.get_window_actors();
-    // check for windows: https://github.com/GNOME/gnome-shell/blob/751fedb95cbb56ff23bb75ddb6e9a2210a8265c2/js/ui/workspaceAnimation.js#L57
-    //
     windows.forEach(windowActor => {
       let window = windowActor.meta_window;
       window.move_to_monitor(primaryMonitor.index)
+    })
+  }
 
+  _moveWindowsToWorkspaces() {
+    let windows = global.get_window_actors();
+    windows.forEach(windowActor => {
+      let window = windowActor.meta_window;
       let app = this._windowTracker.get_window_app(window);
       let workspaceNum = this._appConfigs.get(app.id);
-
-      if (workspaceNum) {
+      if (workspaceNum !== undefined) {
         this._moveWindow(window, workspaceNum)
       }
     })
+  }
+
+  organiseWindows() {
+    this._moveWindowsToPrimaryMonitor()
+    this._moveWindowsToWorkspaces()
   }
 }
 
