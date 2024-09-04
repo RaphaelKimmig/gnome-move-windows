@@ -6,6 +6,46 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import Meta from 'gi://Meta';
+
+
+
+var KeyManager = class KeyManager {
+  constructor() {
+    this.grabbers = new Map();
+
+    global.display.connect('accelerator-activated', (display, action, deviceId, timestamp) => {
+      this._onAccelerator(action);
+    });
+  }
+
+  listenFor(accelerator, callback) {
+    let action = global.display.grab_accelerator(accelerator, Meta.KeyBindingFlags.NONE);
+
+    if (action == Meta.KeyBindingAction.NONE) {
+      console.log(`Unable to grab accelerator [binding=${accelerator}]`);
+    } else {
+      let name = Meta.external_binding_name_for_action(action);
+
+      Main.wm.allowKeybinding(name, Shell.ActionMode.ALL);
+
+      this.grabbers.set(action, {
+        name: name,
+        accelerator: accelerator,
+        callback: callback,
+        action: action
+      });
+    }
+  }
+
+  _onAccelerator(action) {
+    let grabber = this.grabbers.get(action);
+
+    if (grabber) {
+      grabber.callback();
+    }
+  }
+}
 
 
 class WindowMover {
@@ -19,6 +59,12 @@ class WindowMover {
     this._settings.connectObject('changed',
       this._updateAppConfigs.bind(this), this);
     this._updateAppConfigs();
+
+    this._keyManager = new KeyManager();
+    this._keyManager.listenFor("<Super><Shift>o", () => {
+      this.organiseWindows()
+    });
+
   }
 
   _updateAppConfigs() {
@@ -36,6 +82,12 @@ class WindowMover {
     this._windowTracker.disconnectObject(this);
     this._settings = null;
     this._windowTracker = null;
+
+    // To stop listening:
+    for (let [action, grabber] of this._keyManager.grabbers) {
+      global.display.ungrab_accelerator(grabber.action);
+      Main.wm.allowKeybinding(grabber.name, Shell.ActionMode.NONE);
+    }
 
     GLib.source_remove(this._timeout_id);
 
